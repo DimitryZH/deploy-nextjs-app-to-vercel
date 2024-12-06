@@ -1,11 +1,13 @@
 name: Deployment
 
+# Trigger workflow on push to main branch and any pull request
 on:
   push:
     branches: [main]
   pull_request:
 
 jobs:
+  # Job to handle Vercel deployment
   vercel:
     runs-on: ubuntu-latest
     strategy:
@@ -13,14 +15,17 @@ jobs:
         node-version: [20.x]
 
     steps:
+      # Check out repository code
       - name: Checkout
         uses: actions/checkout@v4.1.7
 
+      # Setup Node.js environment
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4.0.3
         with:
           node-version: ${{ matrix.node-version }}
 
+      # Install pnpm package manager
       - uses: pnpm/action-setup@v2.4.1
         name: Install pnpm
         id: pnpm-install
@@ -28,12 +33,14 @@ jobs:
           version: 7
           run_install: false
 
+      # Get pnpm cache directory path
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
+      # Cache pnpm dependencies
       - uses: actions/cache@v4.0.2
         name: Setup pnpm cache
         with:
@@ -42,15 +49,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Install project dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # Build the project
       - name: Build
         run: pnpm build
 
+      # Run linting checks
       - name: Lint
         run: pnpm lint
 
+      # Initialize deployment process
       - name: Start Deployment
         uses: bobheadxi/deployments@v1.5.0
         id: deployment-preview
@@ -59,6 +70,8 @@ jobs:
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           env: Preview
       # Deploy pre pull request
+
+      # Deploy preview environment for pull requests
       - name: Deploy to Preview
         id: vercel-action-preview
         if: github.ref != 'refs/heads/main'
@@ -70,6 +83,7 @@ jobs:
           scope: ${{ secrets.VERCEL_ORG_ID }}
           github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
+      # Deploy to production for main branch pushes
       - name: Deploy to Production
         uses: amondnet/vercel-action@v25.2.0
         id: vercel-action-production
@@ -83,6 +97,7 @@ jobs:
           vercel-args: "--prod"
           github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
+      # Update deployment status for preview deployments
       - name: Update Deployment Status
         uses: bobheadxi/deployments@v1.5.0
         if: github.ref != 'refs/heads/main'
